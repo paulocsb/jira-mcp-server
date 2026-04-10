@@ -62,6 +62,33 @@ export async function searchIssues(
   });
 }
 
+// ── ADF (Atlassian Document Format) to plain text ──────────────────
+
+function adfToText(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const n = node as Record<string, unknown>;
+
+  if (n.type === "text") return (n.text as string) ?? "";
+
+  const children = Array.isArray(n.content) ? n.content : [];
+  const text = children.map(adfToText).join("");
+
+  switch (n.type) {
+    case "paragraph":
+    case "heading":
+      return text + "\n";
+    case "bulletList":
+    case "orderedList":
+      return text;
+    case "listItem":
+      return `- ${text}`;
+    case "hardBreak":
+      return "\n";
+    default:
+      return text;
+  }
+}
+
 // ── Formatting helpers ──────────────────────────────────────────────
 
 export function formatAssignee(issue: JiraIssue): string {
@@ -87,6 +114,13 @@ export function formatIssue(issue: JiraIssue): string {
 
   if (f.duedate) lines.push(`**Due Date:**  ${f.duedate}`);
   if (f.labels?.length) lines.push(`**Labels:**    ${f.labels.join(", ")}`);
+
+  if (f.description) {
+    const desc = adfToText(f.description).trim();
+    if (desc) {
+      lines.push("", "---", "", "**Description:**", "", desc);
+    }
+  }
 
   return lines.join("\n");
 }
